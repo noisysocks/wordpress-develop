@@ -1113,12 +1113,12 @@ EOF;
 			// RGB color values are not allowed.
 			array(
 				'css'      => 'color: rgb( 100, 100, 100 )',
-				'expected' => '',
+				'expected' => 'color: rgb( 100, 100, 100 )',
 			),
 			// RGBA color values are not allowed.
 			array(
 				'css'      => 'color: rgb( 100, 100, 100, .4 )',
-				'expected' => '',
+				'expected' => 'color: rgb( 100, 100, 100, .4 )',
 			),
 		);
 	}

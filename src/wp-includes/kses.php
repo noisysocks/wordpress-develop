@@ -2397,7 +2397,6 @@ function safecss_filter_attr( $css, $deprecated = '' ) {
 
 	/*
 	 * CSS attributes that accept gradient data types.
-	 *
 	 */
 	$css_gradient_data_types = array(
 		'background',
@@ -2458,23 +2457,72 @@ function safecss_filter_attr( $css, $deprecated = '' ) {
 			}
 		}
 
-		if ( $found && $gradient_attr ) {
-			$css_value = trim( $parts[1] );
-			if ( preg_match( '/^(repeating-)?(linear|radial|conic)-gradient\(([^()]|rgb[a]?\([^()]*\))*\)$/', $css_value ) ) {
-				// Remove the whole `gradient` bit that was matched above from the CSS.
-				$css_test_string = str_replace( $css_value, '', $css_test_string );
-			}
-		}
-
 		if ( $found ) {
-			// Allow CSS calc().
-			$css_test_string = preg_replace( '/calc\(((?:\([^()]*\)?|[^()])*)\)/', '', $css_test_string );
-			// Allow CSS var().
-			$css_test_string = preg_replace( '/\(?var\(--[a-zA-Z0-9_-]*\)/', '', $css_test_string );
+			// Check for any CSS containing \ & } = or comments.
+			$allow_css = ! preg_match( '%[\\\&=}]|/\*%', $css_test_string );
 
-			// Check for any CSS containing \ ( & } = or comments,
-			// except for url(), calc(), or var() usage checked above.
-			$allow_css = ! preg_match( '%[\\\(&=}]|/\*%', $css_test_string );
+			// Allow ()s, but only if:
+			//  - They are balanced.
+			//  - They appear after an identifier for a function that we allow.
+			//  - They are nested within the parens for a function that we allow.
+			if ( $allow_css ) {
+				// todo: make more comprehensive
+				$allowed_functions = array(
+					'rgb',
+					'rgba',
+					'calc',
+					'min',
+					'max',
+					'var',
+				);
+
+				if ( $gradient_attr ) {
+					$allowed_functions = array_merge(
+						$allowed_functions,
+						// todo: make more comprehensive
+						array(
+							'linear-gradient',
+							'repeating-linear-gradient',
+							'radial-gradient',
+							'conic-gradient',
+						)
+					);
+				}
+
+				// todo: filter $allowed_functions
+
+				$allowed_functions_regex = implode(
+					'|',
+					array_map( 'preg_quote', $allowed_functions )
+				);
+
+				$allow_css = preg_match(
+					"/
+					(?(DEFINE)
+						(?<outer_token>
+							(?&char)|(?&function)
+						)
+						(?<inner_token>
+							(?&char)|(?&parens)|(?&function)
+						)
+						(?<function>
+							(?&identifier)(?&parens)
+						)
+						(?<parens>
+							\((?&inner_token)*\)
+						)
+						(?<identifier>
+							$allowed_functions_regex
+						)
+						(?<char>
+							[^)(]
+						)
+					)
+					^(?&outer_token)*$
+					/x",
+					$css_test_string,
+				);
+			}
 
 			/**
 			 * Filters the check for unsafe CSS in `safecss_filter_attr`.
